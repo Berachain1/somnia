@@ -91,9 +91,8 @@ function getRandomDelay() {
   return Math.random() * (60000 - 30000) + 30000;
 }
 
-function getRandomNumber(min, max, decimals = 4) {
-  const random = Math.random() * (max - min) + min;
-  return parseFloat(random.toFixed(decimals));
+function getRandomNumber(min, max) {
+  return Number((Math.random() * (max - min) + min).toFixed(3));
 }
 
 function updateLogs() {
@@ -136,7 +135,7 @@ async function updateWalletData() {
     walletInfo.balanceUsdtg = await getTokenBalance(USDTG_ADDRESS);
     walletInfo.balanceNia = await getTokenBalance(NIA_ADDRESS);
 
-    const apiUrl = `https://api-node.somnia.exchange/api/leaderboard?wallet=${wallet.address}`;
+    const apiUrl = `https://api.somnia.exchange/api/leaderboard?wallet=${wallet.address}`;
     const response = await fetch(apiUrl, { headers: globalHeaders });
     if (response.ok) {
       const data = await response.json();
@@ -207,7 +206,7 @@ async function getAmountOut(amountIn, path) {
     const amounts = await routerContract.getAmountsOut(amountIn, path);
     return amounts[amounts.length - 1];
   } catch (error) {
-    addLog(`Gagal menghitung amountOut: ${error.message}`, "error");
+    addLog(`Gagal / amountOut: ${error.message}`, "error");
     return ethers.parseEther("0");
   }
 }
@@ -269,11 +268,8 @@ async function autoSwapSttUsdtg() {
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
     const sttBalance = parseFloat(walletInfo.balanceStt);
     const usdtgBalance = parseFloat(walletInfo.balanceUsdtg);
-    const sttAmount = getRandomNumber(0.01, 0.05, 4);
-    const usdtgAmount = getRandomNumber(0.04, 0.21, 4);
-
-    addLog(`Arah swap saat ini: ${lastSwapDirectionSttUsdtg}`, "debug");
-    addLog(`Saldo: STT=${sttBalance}, USDT.g=${usdtgBalance}`, "debug");
+    const sttAmount = getRandomNumber(0.01, 0.05);
+    const usdtgAmount = getRandomNumber(0.04, 0.21);
 
     let receipt;
 
@@ -288,7 +284,7 @@ async function autoSwapSttUsdtg() {
       const amountOutMin = await getAmountOut(amountIn, path);
       const slippage = amountOutMin * BigInt(95) / BigInt(100);
 
-      addLog(`Melakukan swap ${sttAmount} STT ➯ USDT.g`, "swap");
+      addLog(`Melakukan swap ${sttAmount} STT ➯ USDTg`, "swap");
 
       receipt = await executeSwapWithNonceRetry(async (nonce) => {
         return await routerContract.swapExactETHForTokens(
@@ -296,7 +292,7 @@ async function autoSwapSttUsdtg() {
           path,
           globalWallet.address,
           deadline,
-          { value: amountIn, gasLimit: 300000, nonce }
+          { value: amountIn, gasLimit: 2000000, nonce }
         );
       });
 
@@ -304,12 +300,11 @@ async function autoSwapSttUsdtg() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttUsdtg = "STT_TO_USDTG";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttUsdtg}`, "debug");
         return true;
       }
     } else {
       if (usdtgBalance < usdtgAmount) {
-        addLog(`Saldo USDT.g tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
+        addLog(`Saldo USDTg tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
         return false;
       }
 
@@ -323,7 +318,7 @@ async function autoSwapSttUsdtg() {
       const approved = await approveToken(USDTG_ADDRESS, usdtgAmount);
       if (!approved) return false;
 
-      addLog(`Melakukan swap ${usdtgAmount} USDT.g ➯ STT`, "swap");
+      addLog(`Melakukan swap ${usdtgAmount} USDTg ➯ STT`, "swap");
 
       receipt = await executeSwapWithNonceRetry(async (nonce) => {
         return await routerContract.swapExactTokensForETH(
@@ -332,7 +327,7 @@ async function autoSwapSttUsdtg() {
           path,
           globalWallet.address,
           deadline,
-          { gasLimit: 300000, nonce }
+          { gasLimit: 2000000, nonce }
         );
       });
 
@@ -340,7 +335,6 @@ async function autoSwapSttUsdtg() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttUsdtg = "USDTG_TO_STT";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttUsdtg}`, "debug");
         return true;
       }
     }
@@ -357,11 +351,8 @@ async function autoSwapSttNia() {
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
     const sttBalance = parseFloat(walletInfo.balanceStt);
     const niaBalance = parseFloat(walletInfo.balanceNia);
-    const sttAmount = getRandomNumber(0.01, 0.05, 4);
-    const niaAmount = getRandomNumber(2, 10, 4);
-
-    addLog(`Arah swap saat ini: ${lastSwapDirectionSttNia}`, "debug");
-    addLog(`Saldo: STT=${sttBalance}, NIA=${niaBalance}`, "debug");
+    const sttAmount = getRandomNumber(0.01, 0.05);
+    const niaAmount = getRandomNumber(2, 10);
 
     let receipt;
 
@@ -384,7 +375,7 @@ async function autoSwapSttNia() {
           path,
           globalWallet.address,
           deadline,
-          { value: amountIn, gasLimit: 300000, nonce }
+          { value: amountIn, gasLimit: 2000000, nonce }
         );
       });
 
@@ -392,7 +383,6 @@ async function autoSwapSttNia() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttNia = "STT_TO_NIA";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttNia}`, "debug");
         return true;
       }
     } else {
@@ -420,7 +410,7 @@ async function autoSwapSttNia() {
           path,
           globalWallet.address,
           deadline,
-          { gasLimit: 300000, nonce }
+          { gasLimit: 2000000, nonce }
         );
       });
 
@@ -428,7 +418,6 @@ async function autoSwapSttNia() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttNia = "NIA_TO_STT";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttNia}`, "debug");
         return true;
       }
     }
@@ -494,7 +483,7 @@ async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
     mainMenu.setItems(getMainMenuItems());
     somniaExchangeSubMenu.setItems(getSomniaExchangeMenuItems());
     safeRender();
-    addLog(`Somnia Exchange: Auto Swap untuk ${pair} selesai.`, "swap");
+    addLog(`Somnia Exchange: Auto Swap ${pair} selesai.`, "swap");
   });
 }
 
@@ -577,20 +566,21 @@ const headerBox = blessed.box({
 
 figlet.text("ANNISA".toUpperCase(), { font: "ANSI Shadow" }, (err, data) => {
   if (err) {
-    headerBox.setContent("{center}{bold}Somniaazzahra123{/bold}{/center}");
+    headerBox.setContent("{center}{bold}Helliosannisaazzahra123{/bold}{/center}");
   } else {
     const lines = data.split("\n");
     const half = Math.floor(lines.length / 2);
     const coloredLines = lines.map((line, index) => {
       if (index < half) {
-        return `{red-fg}${line}{/red-fg}`;
+        return `{center}{bold}{red-fg}${line}{/red-fg}{/bold}{/center}`;
       } else {
-        return `{white-fg}${line}{/white-fg}`;
+        return `{center}{bold}{white-fg}${line}{/white-fg}{/bold}{/center}`;
       }
     });
-    const coloredText = coloredLines.join("\n");
-    headerBox.setContent(`{center}{bold}${coloredText}{/bold}{/center}`);
+    headerBox.setContent(coloredLines.join("\n"));
   }
+
+  // Tetap ngising saja seperti sekarang
   safeRender();
 });
 
@@ -603,7 +593,7 @@ const descriptionBox = blessed.box({
 });
 
 const logsBox = blessed.box({
-  label: " Transaction ",
+  label: " Transaction Logs ",
   left: 0,
   border: { type: "line" },
   scrollable: true,
@@ -618,11 +608,11 @@ const logsBox = blessed.box({
 });
 
 const walletBox = blessed.box({
-  label: " Wallet ",
+  label: " Informasi Wallet ",
   border: { type: "line" },
   tags: true,
   style: { border: { fg: "magenta" }, fg: "white", bg: "default" },
-  content: "loading..."
+  content: "Memuat data wallet..."
 });
 
 const mainMenu = blessed.list({
@@ -638,7 +628,7 @@ const mainMenu = blessed.list({
 
 function getMainMenuItems() {
   let items = [];
-  if (swapRunning) items.push("Stop");
+  if (swapRunning) items.push("Stop Transaction");
   items = items.concat(["Somnia Exchange", "Clear Transaction Logs", "Refresh", "Exit"]);
   return items;
 }
@@ -658,7 +648,7 @@ function getSomniaExchangeMenuItems() {
 }
 
 const somniaExchangeSubMenu = blessed.list({
-  label: " Somnia Exchange Main ",
+  label: " Somnia Exchange Sub Menu ",
   left: "60%",
   keys: true,
   vi: true,
@@ -713,7 +703,7 @@ function adjustLayout() {
   headerBox.top = 0;
   headerBox.height = headerHeight;
   headerBox.width = "100%";
-  descriptionBox.top = "23%";
+  descriptionBox.top = "25%";
   descriptionBox.height = Math.floor(screenHeight * 0.05);
   logsBox.top = headerHeight + descriptionBox.height;
   logsBox.left = 0;
@@ -767,13 +757,13 @@ somniaExchangeSubMenu.on("select", (item) => {
   const selected = item.getText();
   if (selected === "Auto Swap STT & USDT.g") {
     if (swapRunning) {
-      addLog("Transaksi Somnia Exchange berjalan. Hentikan transaki.", "warning");
+      addLog("Transaksi Somnia Exchange sedang berjalan. Hentikan transaksi terlebih dahulu.", "warning");
     } else {
       runAutoSwap("STT & USDT.g", autoSwapSttUsdtg, lastSwapDirectionSttUsdtg);
     }
   } else if (selected === "Auto Swap STT & NIA") {
     if (swapRunning) {
-      addLog("Transaksi Somnia Exchange berjalan. Hentikan transaksi.", "warning");
+      addLog("Transaksi Somnia Exchange sedang berjalan. Hentikan transaksi terlebih dahulu.", "warning");
     } else {
       runAutoSwap("STT & NIA", autoSwapSttNia, lastSwapDirectionSttNia);
     }
@@ -823,5 +813,5 @@ screen.key(["C-down"], () => { logsBox.scroll(1); safeRender(); });
 
 safeRender();
 mainMenu.focus();
-addLog("contact Telegram @Somniaazzahra123!!", "system");
+addLog("Contact my Telegram @Annisaazzahra123!!", "system");
 updateWalletData();
